@@ -1,5 +1,4 @@
 ﻿using Microsoft.SemanticKernel.Memory;
-using Microsoft.SemanticKernel.Connectors.Redis;
 using StackExchange.Redis;
 using Common.Models;
 using System.Net.Http.Json;
@@ -24,24 +23,26 @@ namespace DatabaseGenerator
             return result?.embedding ?? Array.Empty<float>();
         }
 
-        static IEnumerable<string> ChunkText(string text, int maxTokens = 512)
+        static IEnumerable<string> ChunkText(string text, int maxWords = 512)
         {
-            // Simple chunking by sentence or word count (customize as needed)
-            var words = text.Split(' ');
-            for (int i = 0; i < words.Length; i += maxTokens)
-                yield return string.Join(' ', words.Skip(i).Take(maxTokens));
+            // Chunk by whole words, not by characters
+            var words = text.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < words.Length; i += maxWords)
+            {
+                yield return string.Join(' ', words.Skip(i).Take(maxWords));
+            }
         }
 
-        static async Task AddPolicyDocumentAsync(string id, string title, string content, string department, dynamic collection)
+        static async Task AddPolicyDocumentAsync(string id, string title, string content, string department, Common.Models.RedisVectorStore vectorStore)
         {
             int chunkIndex = 0;
             foreach (var chunk in ChunkText(content, 128))
             {
-                chunkIndex = await AddChunkWithRetryAsync(id, title, chunk, department, collection, chunkIndex);
+                chunkIndex = await AddChunkWithRetryAsync(id, title, chunk, department, vectorStore, chunkIndex);
             }
         }
 
-        static async Task<int> AddChunkWithRetryAsync(string id, string title, string chunk, string department, dynamic collection, int chunkIndex)
+        static async Task<int> AddChunkWithRetryAsync(string id, string title, string chunk, string department, Common.Models.RedisVectorStore vectorStore, int chunkIndex)
         {
             try
             {
@@ -52,9 +53,9 @@ namespace DatabaseGenerator
                     Title = title,
                     Content = chunk,
                     Department = department,
-                    Embedding = new ReadOnlyMemory<float>(embedding)
+                    Embedding = embedding
                 };
-                await collection.UpsertAsync(record, System.Threading.CancellationToken.None);
+                await vectorStore.InsertAsync(record);
                 return chunkIndex + 1;
             }
             catch (HttpRequestException)
@@ -67,8 +68,8 @@ namespace DatabaseGenerator
                 int mid = chunk.Length / 2;
                 var left = chunk.Substring(0, mid);
                 var right = chunk.Substring(mid);
-                chunkIndex = await AddChunkWithRetryAsync(id, title, left, department, collection, chunkIndex);
-                chunkIndex = await AddChunkWithRetryAsync(id, title, right, department, collection, chunkIndex);
+                chunkIndex = await AddChunkWithRetryAsync(id, title, left, department, vectorStore, chunkIndex);
+                chunkIndex = await AddChunkWithRetryAsync(id, title, right, department, vectorStore, chunkIndex);
                 return chunkIndex;
             }
         }
@@ -85,12 +86,11 @@ namespace DatabaseGenerator
             // Connect to Redis
             var redis = ConnectionMultiplexer.Connect("localhost:6379");
             var db = redis.GetDatabase();
-            var vectorStore = new RedisVectorStore(db);
-            var collection = vectorStore.GetCollection<string, PolicyDocumentEmbedding>("policy-documents");
+            var vectorStore = new Common.Models.RedisVectorStore(db);
 
             // Directory containing PDF documents
             string docsDir = @"C:\Temp\ControlledDocs";
-            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");
+            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");// "Board Governance Policy.pdf");
 
             foreach (var pdfPath in pdfFiles)
             {
@@ -99,7 +99,7 @@ namespace DatabaseGenerator
                 string title = Path.GetFileName(pdfPath);
                 string department = "IT"; // Or extract from filename/metadata if needed
                 Console.WriteLine($"Processing {title}...");
-                await AddPolicyDocumentAsync(docId, title, content, department, collection);
+                await AddPolicyDocumentAsync(docId, title, content, department, vectorStore);
             }
         }
 
