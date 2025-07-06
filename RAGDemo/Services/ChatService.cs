@@ -21,7 +21,13 @@ namespace RAGDemo.Services
         public ChatService()
         {
             _httpClient = new HttpClient { BaseAddress = new Uri("http://ollama:11434/") };
-            var redis = ConnectionMultiplexer.Connect("localhost:6379");
+            var options = new ConfigurationOptions
+            {
+                //AbortOnConnectFail = false,
+                EndPoints = { "redis:6379" }
+            };
+            var redis = ConnectionMultiplexer.Connect(options);
+
             var db = redis.GetDatabase();
             _vectorStore = new RedisVectorStore(db, "policy-documents");
         }

@@ -2,6 +2,7 @@ using Common.Models;
 using Microsoft.AspNetCore.Mvc;
 using RAGDemo.Interfaces;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace RAGDemo.Controllers

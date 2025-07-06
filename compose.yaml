@@ -1,27 +1,51 @@
 services:
   ollama:
     image: "ollama/ollama"
-    environment:
-      NVIDIA_VISIBLE_DEVICES: "all"
-      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
     ports:
       - "11434:11434"
     volumes:
       - ./.dockerTemps/ML:/root/.ollama/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all # Or specify a specific GPU ID
+              capabilities: [gpu]
+    networks:
+      - ai
   redis:
-    image: "redislabs/redisearch:latest"
+    build:
+      context: ./Redis
+      dockerfile: Dockerfile
     ports:
       - "6379:6379"
     volumes:
       - ./.dockerTemps/DB:/data/
+    networks:
+      - db
   ragdemo:
     build:
       context: .
       dockerfile: RAGDemo/Dockerfile
     ports:
-      - "5000:80"
+      - "5000:8080"
+      - "5002:8081"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-    depends_on:
-      - redis
-      - ollama
+    networks:
+      - api
+      - ai
+      - db
+  ui:
+    build:
+      context: ./UI
+      dockerfile: Dockerfile
+    ports:
+      - "5001:80"
+    networks:
+      - api
+networks:
+  ai:
+  api:
+  db:

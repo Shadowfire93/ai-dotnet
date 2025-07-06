@@ -35,7 +35,7 @@ namespace Common.Models
             await _db.SetAddAsync(_collection, record.Id); // For fast scan
         }
 
-        public async Task<List<PolicyDocumentEmbedding>> SearchAsync(float[] queryEmbedding, int topK = 3, double minScore = 0.7)
+        public async Task<List<PolicyDocumentEmbedding>> SearchAsync(float[] queryEmbedding, int topK = 3, double minScore = 0.3)
         {
             var ids = (await _db.SetMembersAsync(_collection)).Select(x => x.ToString()).ToList();
             var results = new List<(PolicyDocumentEmbedding, double)>();

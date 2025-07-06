@@ -1,10 +1,12 @@
-﻿using Microsoft.SemanticKernel.Memory;
+﻿using Common.Models;
+using Microsoft.SemanticKernel.Memory;
+using Microsoft.SemanticKernel.Text;
 using StackExchange.Redis;
-using Common.Models;
+using System.IO;
 using System.Net.Http.Json;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
-using System.IO;
+using UglyToad.PdfPig.Util;
 
 namespace DatabaseGenerator
 {
@@ -26,11 +28,15 @@ namespace DatabaseGenerator
         static IEnumerable<string> ChunkText(string text, int maxWords = 512)
         {
             // Chunk by whole words, not by characters
-            var words = text.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < words.Length; i += maxWords)
-            {
-                yield return string.Join(' ', words.Skip(i).Take(maxWords));
-            }
+
+            List<string> paragraphs = TextChunker.SplitPlainTextParagraphs(TextChunker.SplitPlainTextLines(text, 128), maxWords);
+            return paragraphs;
+
+            //var words = text.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            //for (int i = 0; i < words.Length; i += maxWords)
+            //{
+            //    yield return string.Join(' ', words.Skip(i).Take(maxWords));
+            //}
         }
 
         static async Task AddPolicyDocumentAsync(string id, string title, string content, string department, Common.Models.RedisVectorStore vectorStore)
@@ -77,8 +83,23 @@ namespace DatabaseGenerator
         static string ExtractTextFromPdf(string filePath)
         {
             using var pdf = PdfDocument.Open(filePath);
-            var text = string.Join("\n", pdf.GetPages().Select(p => p.Text));
-            return text;
+            //var text = string.Join("\n", pdf.GetPages().Select(p => p.Text));
+
+            var words = new List<Word>();
+            foreach (var page in pdf.GetPages())
+            {
+                words = [.. words, .. page.GetWords(DefaultWordExtractor.Instance)];// NearestNeighbourWordExtractor.Instance)];
+
+
+                //var blocks = DocstrumBoundingBoxes.Instance.GetBlocks(words);
+                //var orderedBlocks = UnsupervisedReadingOrderDetector.Instance.Get(blocks);
+
+            }
+
+            var w = String.Join(" ", words.Select(w => w.Text));
+
+
+            return w;
         }
 
         static async Task Main(string[] args)
@@ -90,7 +111,7 @@ namespace DatabaseGenerator
 
             // Directory containing PDF documents
             string docsDir = @"C:\Temp\ControlledDocs";
-            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");// "Board Governance Policy.pdf");
+            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");// "Advocacy Policy.pdf");// "Board Governance Policy.pdf");// 
 
             foreach (var pdfPath in pdfFiles)
             {
@@ -101,6 +122,7 @@ namespace DatabaseGenerator
                 Console.WriteLine($"Processing {title}...");
                 await AddPolicyDocumentAsync(docId, title, content, department, vectorStore);
             }
+            Console.WriteLine($"Finished");
         }
 
         // Helper for deserializing Ollama embedding response
