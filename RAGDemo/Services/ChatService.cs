@@ -14,7 +14,7 @@ namespace RAGDemo.Services
 {
     public class ChatService : IChatService
     {
-        private readonly HttpClient _httpClient;
+        private HttpClient _httpClient;
         private readonly string _embeddingModel = "bge-large";
         private readonly RedisVectorStore _vectorStore;
 
@@ -24,7 +24,7 @@ namespace RAGDemo.Services
             var options = new ConfigurationOptions
             {
                 //AbortOnConnectFail = false,
-                EndPoints = { "redis:6379" }
+                EndPoints = { "redis:6379", "host.docker.internal:6379" },
             };
             var redis = ConnectionMultiplexer.Connect(options);
 
@@ -34,11 +34,28 @@ namespace RAGDemo.Services
 
         private async Task<float[]> GetEmbeddingAsync(string text, string model)
         {
+            
             // Call Ollama API for embedding
             var requestBody = new { model = model, prompt = text }; // Adjust as needed for Ollama API
-            var response = await _httpClient.PostAsync("/api/embeddings", new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json"));
-            response.EnsureSuccessStatusCode();
-            var json = await response.Content.ReadAsStringAsync();
+            int retry = 0;
+            string? json = "";
+            while (retry <= 1)
+            {
+                try
+                {
+                    var response = await _httpClient.PostAsync("/api/embeddings", new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json"));
+                    response.EnsureSuccessStatusCode();
+                    json = await response.Content.ReadAsStringAsync();
+                    break;
+                }
+                catch (Exception e)
+                {
+                    retry++;
+                    _httpClient = new HttpClient { BaseAddress = new Uri("http://host.docker.internal:11434") };
+                }
+            }
+            
+            
             using var doc = JsonDocument.Parse(json);
             var embedding = doc.RootElement.GetProperty("embedding").EnumerateArray().Select(x => x.GetSingle()).ToArray();
             return embedding;
@@ -53,7 +70,7 @@ namespace RAGDemo.Services
 
         public async Task<string> GetChatResponseAsync(string prompt, List<string> history, string model, string groundingPrompt, string embeddingsModel)
         {
-            var relevantParagraphs = await GetRelevantParagraphsAsync(prompt, embeddingsModel);
+            var relevantParagraphs = await GetRelevantParagraphsAsync(prompt,  embeddingsModel);
             if (relevantParagraphs == null || relevantParagraphs.Count == 0)
             {
                 return "Sorry, I have no information relevant to your request.";

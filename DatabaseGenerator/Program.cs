@@ -1,12 +1,15 @@
 ﻿using Common.Models;
+using Microsoft.Extensions.VectorData.ProviderServices;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.Text;
 using StackExchange.Redis;
 using System.IO;
 using System.Net.Http.Json;
+using System.Numerics;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Util;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace DatabaseGenerator
 {
@@ -41,10 +44,45 @@ namespace DatabaseGenerator
 
         static async Task AddPolicyDocumentAsync(string id, string title, string content, string department, Common.Models.RedisVectorStore vectorStore)
         {
+            bool inserted = false;
             int chunkIndex = 0;
-            foreach (var chunk in ChunkText(content, 128))
+            int vectorSize = 1024;
+            while (!inserted)
             {
-                chunkIndex = await AddChunkWithRetryAsync(id, title, chunk, department, vectorStore, chunkIndex);
+                try
+                {
+                    //Try to insert the embeddings record to the vector DB, if it fails, halve the vector size and try again until it works
+                    List<string> paragraphs = TextChunker.SplitPlainTextParagraphs(TextChunker.SplitPlainTextLines(content, 128), vectorSize);
+
+                    foreach (var p in paragraphs)
+                    {
+                        var embedding = await GetEmbeddingAsync(p);
+                        var record = new PolicyDocumentEmbedding
+                        {
+                            Id = $"{id}_chunk{chunkIndex}",
+                            Title = title,
+                            Content = p,
+                            Department = department,
+                            Embedding = embedding
+                        };
+                        await vectorStore.InsertAsync(record);
+                        chunkIndex++;
+                    }
+                    inserted = true;
+                    //foreach (var chunk in ChunkText(content, 128))
+                    //{
+                    //    chunkIndex = await AddChunkWithRetryAsync(id, title, chunk, department, vectorStore, chunkIndex);
+                    //}
+                }
+                catch (Exception e)
+                {
+                    vectorSize = vectorSize / 2;
+                    for (int i = 0; i < chunkIndex; i++)
+                    {
+                        await vectorStore.RemoveAsync($"{id}_chunk{i}");
+                    }
+                    chunkIndex = 0;
+                }
             }
         }
 
@@ -109,9 +147,11 @@ namespace DatabaseGenerator
             var db = redis.GetDatabase();
             var vectorStore = new Common.Models.RedisVectorStore(db);
 
+            await vectorStore.EnsureIndexAsync();
+
             // Directory containing PDF documents
             string docsDir = @"C:\Temp\ControlledDocs";
-            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");// "Advocacy Policy.pdf");// "Board Governance Policy.pdf");// 
+            var pdfFiles = Directory.GetFiles(docsDir, "Board Remuneration Policy.pdf");// "Advocacy Policy.pdf");//"*.pdf");//  
 
             foreach (var pdfPath in pdfFiles)
             {

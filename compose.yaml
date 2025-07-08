@@ -15,11 +15,11 @@ services:
     networks:
       - ai
   redis:
-    build:
-      context: ./Redis
-      dockerfile: Dockerfile
+    image: "redis:latest"
+
     ports:
       - "6379:6379"
+    command: redis-server --bind 0.0.0.0 --protected-mode no
     volumes:
       - ./.dockerTemps/DB:/data/
     networks:
