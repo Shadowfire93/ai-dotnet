@@ -45,6 +45,28 @@ services:
       - "5001:80"
     networks:
       - api
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong!Passw0rd
+    ports:
+      - "1433:1433"
+    volumes:
+      - ./.dockerTemps/SQL:/var/opt/mssql
+    networks:
+      - db
+  weatherapi:
+    build:
+      context: .
+      dockerfile: WeatherAPI/Dockerfile
+    ports:
+      - "5003:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - api
+      - db
 networks:
   ai:
   api:
