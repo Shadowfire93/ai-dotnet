@@ -151,7 +151,7 @@ namespace DatabaseGenerator
 
             // Directory containing PDF documents
             string docsDir = @"C:\Temp\ControlledDocs";
-            var pdfFiles = Directory.GetFiles(docsDir, "Board Remuneration Policy.pdf");// "Advocacy Policy.pdf");//"*.pdf");//  
+            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");// "Board Remuneration Policy.pdf");// "Advocacy Policy.pdf");// 
 
             foreach (var pdfPath in pdfFiles)
             {
