@@ -74,7 +74,7 @@ namespace DatabaseGenerator
                     //    chunkIndex = await AddChunkWithRetryAsync(id, title, chunk, department, vectorStore, chunkIndex);
                     //}
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     vectorSize = vectorSize / 2;
                     for (int i = 0; i < chunkIndex; i++)
@@ -151,7 +151,7 @@ namespace DatabaseGenerator
 
             // Directory containing PDF documents
             string docsDir = @"C:\Temp\ControlledDocs";
-            var pdfFiles = Directory.GetFiles(docsDir, "*.pdf");// "Board Remuneration Policy.pdf");// "Advocacy Policy.pdf");// 
+            var pdfFiles = Directory.GetFiles(docsDir, "Board Remuneration Policy.pdf");// "Advocacy Policy.pdf");//"*.pdf");//  
 
             foreach (var pdfPath in pdfFiles)
             {

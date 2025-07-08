@@ -48,7 +48,7 @@ namespace RAGDemo.Services
                     json = await response.Content.ReadAsStringAsync();
                     break;
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     retry++;
                     _httpClient = new HttpClient { BaseAddress = new Uri("http://host.docker.internal:11434") };
