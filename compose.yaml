@@ -67,6 +67,25 @@ services:
     networks:
       - api
       - db
+  mcpapi:
+    build:
+      context: .
+      dockerfile: MCPAPI/Dockerfile
+    ports:
+      - "5004:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - api
+      - db
+  mcpui:
+    build:
+      context: ./MCPUI
+      dockerfile: Dockerfile
+    ports:
+      - "5005:80"
+    networks:
+      - api
 networks:
   ai:
   api:

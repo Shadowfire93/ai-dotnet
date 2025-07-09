@@ -1,0 +1,6 @@
+@MCPAPI_HostAddress = http://localhost:5170
+
+GET {{MCPAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
